@@ -1,0 +1,3 @@
+name: StatusBot0
+version: ${project.version}
+main: studio.mkko120.statusbot0.StatusBot0
