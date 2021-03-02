@@ -5,13 +5,12 @@ import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
 import net.md_5.bungee.api.ProxyServer;
 import net.md_5.bungee.api.config.ServerInfo;
+import studio.mkko120.statusbot0.StatusBot0;
 import studio.mkko120.statusbot0.Storage;
 
 
 import java.sql.*;
 import java.util.logging.Level;
-
-import static studio.mkko120.statusbot0.StatusBot0.getInstance;
 
 public class DBConnection {
 
@@ -25,46 +24,47 @@ public class DBConnection {
     private static String password;
     private static String sshpassword;
     private static boolean remote;
+    private static Session session = null;
 
     public static void loadvars() {
         try {
-            url = getInstance().getConfig().getString("database.url");
-            forwardurl = getInstance().getConfig().getString("database.forwardurl");
-            port = getInstance().getConfig().getInt("database.port");
-            forwardport = getInstance().getConfig().getInt("database.forwardport");
-            database = getInstance().getConfig().getString("database.database");
-            username = getInstance().getConfig().getString("database.username");
-            sshusername = getInstance().getConfig().getString("database.sshusername");
-            password = getInstance().getConfig().getString("database.password");
-            sshpassword = getInstance().getConfig().getString("database.sshpassword");
-            remote = getInstance().getConfig().getBoolean("database.remote");
+            url = StatusBot0.getInstance().getConfig().getString("database.url");
+            forwardurl = StatusBot0.getInstance().getConfig().getString("database.forwardurl");
+            port = StatusBot0.getInstance().getConfig().getInt("database.port");
+            forwardport = StatusBot0.getInstance().getConfig().getInt("database.forwardport");
+            database = StatusBot0.getInstance().getConfig().getString("database.database");
+            username = StatusBot0.getInstance().getConfig().getString("database.username");
+            sshusername = StatusBot0.getInstance().getConfig().getString("database.sshusername");
+            password = StatusBot0.getInstance().getConfig().getString("database.password");
+            sshpassword = StatusBot0.getInstance().getConfig().getString("database.sshpassword");
+            remote = StatusBot0.getInstance().getConfig().getBoolean("database.remote");
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    public static ResultSet localquerry(String querry) {
+    public static Connection localquerry() {
         Connection con = null;
 
-        ResultSet rs = null;
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
             con = DriverManager.getConnection("jdbc:mysql://" + url + ":" + port + "/" + database, username, password);
-            Statement stm = con.createStatement();
-            rs = stm.executeQuery(querry);
             ProxyServer.getInstance().getLogger().log(Level.INFO, "Successfully initialized database connection!");
         } catch (Exception e) {
             e.printStackTrace();
-        } finally {
-            if (con != null) {
-                try {
-                    con.close();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
-            }
         }
-        return rs;
+        return con;
+    }
+    public static Connection backupquerry() {
+        Connection con = null;
+        try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            con = DriverManager.getConnection("jdbc:mysql://localhost:3306/StatusServer", "root", "");
+            ProxyServer.getInstance().getLogger().log(Level.INFO, "Successfully initialized database connection!");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return con;
     }
 
     /**
@@ -72,10 +72,9 @@ public class DBConnection {
         * @author mkko120
         */
 
-    public static ResultSet remotequerry(String querry) {
-        Session session = null;
+    public static Connection remotequerry() {
+
         try {
-            Connection con = null;
             session = new JSch().getSession(sshusername, url, port);
             session.setPassword(sshpassword);
             session.connect();
@@ -84,43 +83,38 @@ public class DBConnection {
             e.printStackTrace();
         }
         Connection con = null;
-
-        ResultSet rs = null;
         try {
             Class.forName("com.mysql.cj.jdbc.Driver");
             con = DriverManager.getConnection("jdbc:mysql://" + forwardurl +":" + forwardport + "/" + database, username, password);
-            Statement stm = con.createStatement();
-            rs = stm.executeQuery(querry);
             ProxyServer.getInstance().getLogger().log(Level.INFO, "Successfully initialized database connection!");
         } catch (Exception e) {
             e.printStackTrace();
-        } finally {
-            if (con != null) {
-                try {
-                    con.close();
-                } catch (SQLException e) {
-                    e.printStackTrace();
-                }
-            }
-            if (session != null) {
-                try {
-                    session.disconnect();
-                } catch (Exception e){
-                    e.printStackTrace();
-                }
-            }
         }
-        return rs;
+        return con;
     }
 
     public static void resultUpdate() {
+        Connection con = null;
         try {
-
-            ResultSet rs;
             if (remote) {
-                rs = remotequerry("SELECT * FROM statistics");
+                con = remotequerry();
             } else {
-                rs = localquerry("SELECT * FROM statistics");
+                con = localquerry();
+            }
+
+            if (con == null) {
+                ProxyServer.getInstance().getLogger().warning("Cannot initalize database connection, trying with default settings...");
+                con = backupquerry();
+            }
+            Statement st = con.createStatement();
+            ResultSet rs = st.executeQuery("SELECT * FROM statistics");
+            if (rs == null) {
+                ProxyServer.getInstance().getLogger().log(Level.WARNING,"No connection to database (result == null)");
+                return;
+            }
+            else if (rs.wasNull()) {
+                ProxyServer.getInstance().getLogger().log(Level.WARNING,"No data in database");
+                return;
             }
             while (rs.next()) {
                 StatusServer server;
@@ -139,8 +133,25 @@ public class DBConnection {
                 Storage.serverArray.add(server);
             }
 
-        } catch (SQLException e) {
+            ProxyServer.getInstance().getLogger().info(Storage.serverArray.toString()+", "+rs.toString());
+
+        } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            if (con != null) {
+                try {
+                    con.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+            if (session != null) {
+                try {
+                    session.disconnect();
+                } catch (Exception e){
+                    e.printStackTrace();
+                }
+            }
         }
     }
 }

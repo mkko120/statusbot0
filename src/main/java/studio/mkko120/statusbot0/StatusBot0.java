@@ -30,11 +30,13 @@ public final class StatusBot0 extends Plugin {
     @Override
     public void onEnable() {
         instance = this;
-        // Plugin startup logic
-        getLogger().log(Level.INFO, "ServerStatus[BUNGEE]: Active");
-        DBConnection.resultUpdate();
-        ProxyServer.getInstance().getPluginManager().registerCommand(this, new StatusCommand());
         loadConfig();
+        // Plugin startup logic
+        DBConnection.loadvars();
+        DBConnection.resultUpdate();
+        getLogger().log(Level.INFO, "ServerStatus[BUNGEE]: Active");
+        getLogger().log(Level.INFO, "ServerStatus[BUNGEE]: " + Storage.serverArray.size());
+        ProxyServer.getInstance().getPluginManager().registerCommand(this, new StatusCommand());
     }
 
     @Override
@@ -43,7 +45,10 @@ public final class StatusBot0 extends Plugin {
     }
 
     public void loadConfig() {
-        File file = new File(instance.getDataFolder(), "config.yml");
+        if (!getDataFolder().exists()) {
+            getDataFolder().mkdir();
+        }
+        File file = new File(getDataFolder(), "config.yml");
         try {
             config = ConfigurationProvider.getProvider(YamlConfiguration.class).load(file);
         } catch (IOException e) {

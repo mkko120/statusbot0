@@ -1,0 +1,18 @@
+database:
+  #enter here your credentials to database
+  #Those are default values
+  url: localhost
+  port: 3306
+  #This is database name, and this one you must create manually
+  database: ServerStatus
+  #Those two are your username and password to database access.
+  username: root
+  password:
+
+  ######################################
+  #if you want to connect remotely please change this to true,
+  remote: false
+  #enter your username, password, port and url to ssh server you want to connect to.
+  sshusername:
+  sshpassword:
+  ######################################
